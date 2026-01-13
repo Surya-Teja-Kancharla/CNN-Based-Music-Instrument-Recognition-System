@@ -67,57 +67,70 @@ def login_page():
 
 def main_app():
     st.set_page_config(
-        page_title="InstruNet AI – Music Instrument Recognition",
+        page_title="InstruNet AI - Music Instrument Recognition",
         layout="wide"
     )
 
     st.markdown("""
-    <style>
-    /* ... existing body and block-container styles ... */
+        <style>
+        /* ---------- GLOBAL LAYOUT FIX ---------- */
+        .block-container {
+            padding-top: 1.2rem;
+            padding-left: 2rem;
+            padding-right: 2rem;
+            padding-bottom: 2rem;
+        }
 
-    .profile-horizontal {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
+        .block-container h1:first-of-type {
+            margin-top: 0rem;
+        }
 
-    .user-text-block {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        line-height: 1.1;
-    }
+        /* ---------- PROFILE / HEADER ---------- */
+        .profile-horizontal {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: -25px;
+        }
 
-    .avatar {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        background-color: #3b82f6;
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 700;
-        flex-shrink: 0; /* Prevents avatar from warping if space is tight */
-    }
+        .user-text-block {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            line-height: 1.1;
+        }
 
-    .role-text {
-        font-size: 12px;
-        color: #9aa0a6;
-    }
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #3b82f6;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
 
-    /* Minimal styling for the button container */
-    .logout-container button {
-        font-size: 12px !important;
-        padding: 4px 12px !important;
-        height: auto !important;
-        border-radius: 8px !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+        .role-text {
+            font-size: 12px;
+            color: #9aa0a6;
+        }
+
+        /* ---------- LOGOUT BUTTON ---------- */
+        .logout-container button {
+            font-size: 12px !important;
+            padding: 6px 14px !important;
+            height: 36px !important;
+            border-radius: 8px;
+        }
+        </style>
+        """, unsafe_allow_html=True)
 
     # --------------------------------------------------
-    # HEADER (Alignment Fixed)
+    # HEADER
     # --------------------------------------------------
 
     # Using vertical_alignment="center" to keep the app title and user block level
