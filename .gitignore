@@ -1,19 +1,168 @@
-# Ignore the data directory completely
-data/
-
-# Optional: ignore common Python artifacts
+# Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
 *.egg-info/
-.env
-.venv/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+env/
+ENV/
+instrunet_env/
 InstruNet_venv/
+.venv
 
-# Optional: ignore Jupyter checkpoints
-.ipynb_checkpoints/
-
-# Optional: ignore OS-specific files
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 .DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+*.env
+
+# Streamlit
+.streamlit/secrets.toml
+.streamlit/config.toml
+
+# Logs
+*.log
+logs/
+
+# Temporary Files
+*.tmp
+tmp/
+temp/
+.cache/
+
+# Data (large files - use Git LFS if needed)
+data/IRMAS-TrainingData/
+data/IRMAS-TestingData/
+data/irmas_mono/
+data/polyphonic_test_data/
+data/segmented_debug/
+data/post_preprocessing/
+
+# Model Files (large - consider Git LFS)
+saved_models/*.h5
+!model/best_l2_regularized_model.h5
+
+# Reports (generated files)
+reports/Task_16/*.json
+reports/Task_16/*.png
+
+# Backup Files
+*.bak
+*~
+
+# OS Files
 Thumbs.db
+.DS_Store
+desktop.ini
+
+# Documentation Temp Files
+~$*.docx
+~$*.doc
+
+# Test Files
+test/
+tests/
+*.test.py
+
+# Coverage
+.coverage
+htmlcov/
+*.cover
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff (if applicable)
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff (if applicable)
+instance/
+.webassets-cache
+
+# Scrapy stuff (if applicable)
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
