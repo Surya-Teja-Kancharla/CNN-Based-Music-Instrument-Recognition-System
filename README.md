@@ -2,7 +2,7 @@
 
 A sophisticated CNN-based system for automatic detection and classification of musical instruments in audio tracks. Built as the culmination of a comprehensive internship project focusing on deep learning for audio analysis.
 
-## 🔧 App Link: 
+## 🔧 App Link 
 
 https://cnn-based-music-instrument-recognition-system.streamlit.app/
 
