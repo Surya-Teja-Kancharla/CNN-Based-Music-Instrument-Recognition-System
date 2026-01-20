@@ -38,7 +38,7 @@ The app will open in your browser at: `http://localhost:8501`
 **Default Credentials:**
 
 - **Username**: Your name (anything you want)
-- **Password**: `instrunet2025`
+- **Password**: No password
 
 ---
 
@@ -134,24 +134,14 @@ streamlit run app.py --server.port 8502
 ### Linux/Mac:
 
 ```bash
-export INSTRUNET_PASSWORD="your_secure_password"
 streamlit run app.py
 ```
 
 ### Windows:
 
 ```cmd
-set INSTRUNET_PASSWORD=your_secure_password
 streamlit run app.py
 ```
-
----
-
-## 📚 Next Steps
-
-- 📖 Read full [README.md](README.md) for details
-- 🚀 Check [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for production
-- ✅ Review [TASK_19_COMPLETION.md](TASK_19_COMPLETION.md) for features
 
 ---
 
@@ -194,8 +184,7 @@ Don't have audio files? Try these:
 
 1. Check error message in the app
 2. Review [README.md](README.md) troubleshooting section
-3. Check [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for setup issues
-4. Verify all dependencies are installed
+3. Verify all dependencies are installed
 
 ---
 
