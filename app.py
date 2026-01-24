@@ -28,7 +28,10 @@ load_dotenv()
 # SUPABASE CONFIGURATION
 # ==================================================
 
-# Initialize Supabase client
+if not SUPABASE_URL or not SUPABASE_KEY:
+    st.error("⚠️ Supabase credentials are missing. Please configure Streamlit secrets.")
+    st.stop()
+
 supabase: Client = create_client(
     SUPABASE_URL,
     SUPABASE_KEY
