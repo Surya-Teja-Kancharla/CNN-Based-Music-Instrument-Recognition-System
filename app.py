@@ -8,13 +8,30 @@ import librosa.display
 import matplotlib.pyplot as plt
 import numpy as np
 from io import BytesIO
+from supabase import create_client, Client
+import re
+from datetime import datetime
+import time
 
 from pipeline import run_inference
 from utils.pdf_report import generate_pdf_report
 from utils.visualization import create_intensity_timeline
 from config import (
     CLASS_NAMES, CLASS_DISPLAY_NAMES, CLASS_ICONS,
-    TARGET_SR, COLORS
+    TARGET_SR, COLORS, SUPABASE_URL, SUPABASE_KEY
+)
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# ==================================================
+# SUPABASE CONFIGURATION
+# ==================================================
+
+# Initialize Supabase client
+supabase: Client = create_client(
+    SUPABASE_URL,
+    SUPABASE_KEY
 )
 
 # ==================================================
@@ -23,87 +40,358 @@ from config import (
 
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
+
+if "login_success" not in st.session_state:
+    st.session_state.login_success = False   # 🔹 NEW FLAG
+
 if "user" not in st.session_state:
     st.session_state.user = None
+
 if "results" not in st.session_state:
     st.session_state.results = None
+
 if "audio_data" not in st.session_state:
     st.session_state.audio_data = None
+
 if "visualizations" not in st.session_state:
     st.session_state.visualizations = {}
 
+if "auth_page" not in st.session_state:
+    st.session_state.auth_page = "login"
+
+
 # ==================================================
-# AUTHENTICATION
+# AUTHENTICATION HELPER FUNCTIONS
 # ==================================================
 
-# OPTION 1: Skip authentication entirely (set to True to enable quick access)
-SKIP_AUTH = os.environ.get("SKIP_AUTH", "false").lower() == "true"
+def validate_email(email):
+    """Validate email format"""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
 
-# OPTION 2: Use environment variable for password (no hardcoding in production)
-# Set INSTRUNET_PASSWORD environment variable to enable password protection
-SHARED_PASSWORD = os.environ.get("INSTRUNET_PASSWORD", None)
+def validate_password(password):
+    """Validate password strength"""
+    if len(password) < 8:
+        return False, "Password must be at least 8 characters long"
+    if not any(c.isupper() for c in password):
+        return False, "Password must contain at least one uppercase letter"
+    if not any(c.islower() for c in password):
+        return False, "Password must contain at least one lowercase letter"
+    if not any(c.isdigit() for c in password):
+        return False, "Password must contain at least one number"
+    return True, "Password is strong"
+
+def hash_password(password):
+    """Hash password using bcrypt-like method"""
+    import hashlib
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def verify_user(email, password):
+    """Verify user credentials against Supabase"""
+    try:
+        hashed_password = hash_password(password)
+        response = supabase.table("users").select("*").eq("email", email).eq("password_hash", hashed_password).execute()
+        
+        if response.data and len(response.data) > 0:
+            return True, response.data[0]
+        return False, None
+    except Exception as e:
+        st.error(f"Error verifying user: {str(e)}")
+        return False, None
+
+def create_user(username, email, password):
+    """Create new user in Supabase"""
+    try:
+        hashed_password = hash_password(password)
+        
+        # Check if user already exists
+        existing_user = supabase.table("users").select("*").eq("email", email).execute()
+        if existing_user.data and len(existing_user.data) > 0:
+            return False, "User with this email already exists"
+        
+        # Create new user
+        user_data = {
+            "username": username,
+            "email": email,
+            "password_hash": hashed_password,
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        response = supabase.table("users").insert(user_data).execute()
+        
+        if response.data and len(response.data) > 0:
+            return True, "Account created successfully!"
+        return False, "Failed to create account"
+    except Exception as e:
+        return False, f"Error creating user: {str(e)}"
 
 # ==================================================
 # LOGIN PAGE
 # ==================================================
 
 def login_page():
-    st.set_page_config(page_title="InstruNet AI – Login", layout="centered")
-    
-    # Center content
+    st.set_page_config(
+        page_title="InstruNet AI - Login",
+        layout="centered",
+        initial_sidebar_state="collapsed"
+    )
+
+    # =======================
+    # GLOBAL CSS
+    # =======================
+    st.markdown("""
+        <style>
+        [data-testid="stSidebar"] {
+            display: none;
+        }
+
+        .block-container {
+            padding-top: 3.0rem;
+        }
+
+        .stTextInput input {
+            border-radius: 8px;
+        }
+
+        .stButton > button {
+            border-radius: 8px;
+            font-weight: 600;
+            padding: 0.6rem;
+        }
+
+        .auth-footer {
+            text-align: center;
+            margin-top: 1.5rem;
+            font-size: 14px;
+            color: #9ca3af;
+        }
+
+        .auth-footer a {
+            color: #8b5cf6;
+            font-weight: 500;
+            text-decoration: underline;
+        }
+
+        .auth-footer a:hover {
+            text-decoration: underline;
+            color: #7c3aed;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # =======================
+    # HEADER
+    # =======================
+    st.markdown("""
+        <div style="text-align:center; margin-bottom:1rem;">
+            <h1 style="color:#667eea;">🎵 InstruNet AI</h1>
+            <p style="font-size:18px; color:#9ca3af;">
+                A CNN-Based Music Instrument Recognition System
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
+
     col1, col2, col3 = st.columns([1, 2, 1])
-    
+
     with col2:
-        st.markdown("<br>" * 3, unsafe_allow_html=True)
-        
-        # Logo and title
-        st.markdown(
-            """
-            <div style="text-align: center;">
-                <h1>🎵 InstruNet AI</h1>
-                <p style="font-size: 18px; color: #6b7280;">
-                    Music Instrument Recognition System
+        if not supabase:
+            st.error("⚠️ Supabase is not configured.")
+            st.stop()
+
+        # =======================
+        # WELCOME TEXT
+        # =======================
+        st.markdown("""
+            <div style="text-align:center; margin-top:2.0rem; margin-bottom:1.5rem;">
+                <p style="font-size:22px; font-weight:600; color:#e5e7eb;">
+                    Welcome Back
                 </p>
-                <p style="font-size: 14px; color: #9ca3af; margin-top: -10px;">
-                    Secure access to audio analysis dashboard
+                <p style="color:#9ca3af; font-size:14px;">
+                    Sign in to your account to continue
                 </p>
             </div>
-            """,
-            unsafe_allow_html=True
-        )
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        # Login form
+        """, unsafe_allow_html=True)
+
+        # =======================
+        # LOGIN SUCCESS MESSAGE (STEP 3)
+        # =======================
+        if st.session_state.get("login_success"):
+            st.success("✅ Login successful! Redirecting to dashboard…")
+            time.sleep(2)
+
+            st.session_state.authenticated = True
+            st.session_state.login_success = False
+            st.rerun()
+
+        # =======================
+        # LOGIN FORM (STEP 2)
+        # =======================
         with st.form("login_form"):
-            username = st.text_input("Your Name", placeholder="Enter your name")
-            
-            # Only show password field if password is configured
-            if SHARED_PASSWORD:
-                password = st.text_input("Password", type="password", placeholder="Enter password")
-            else:
-                password = None
-            
-            col_a, col_b, col_c = st.columns([1, 2, 1])
-            with col_b:
-                submitted = st.form_submit_button("Login", use_container_width=True)
-            
-            if submitted:
-                if not username.strip():
-                    st.error("❌ Please enter your name")
-                elif SHARED_PASSWORD and password != SHARED_PASSWORD:
-                    st.error("❌ Invalid password")
+            email = st.text_input("Email Address", placeholder="your.email@example.com")
+            password = st.text_input(
+                "Password",
+                type="password",
+                placeholder="Enter your password"
+            )
+
+            if st.form_submit_button("🔐 Sign In", type="primary", use_container_width=True):
+                if not email or not password:
+                    st.error("❌ Please fill in all fields")
+                elif not validate_email(email):
+                    st.error("❌ Please enter a valid email address")
                 else:
-                    st.session_state.authenticated = True
-                    st.session_state.user = {"username": username.strip()}
-                    st.success("✅ Login successful! Redirecting...")
-                    st.rerun()
-        
-        # Info box - only show if password is configured
-        if SHARED_PASSWORD:
-            st.info("💡 **Demo Access**: Contact admin for password")
-        else:
-            st.info("💡 **Quick Access**: Just enter your name to continue")
+                    with st.spinner("Verifying..."):
+                        success, user_data = verify_user(email, password)
+                        if success:
+                            st.session_state.user = user_data
+                            st.session_state.login_success = True
+                            st.query_params.clear()
+                            st.rerun()
+                        else:
+                            st.error("❌ Invalid email or password")
+
+        # =======================
+        # REAL HYPERLINK (NO BUTTON)
+        # =======================
+        st.markdown("""
+            <hr style="margin:2rem 0;">
+            <div class="auth-footer">
+                Don't have an account?
+                <a href="?auth=signup" target="_self">Create new account</a>
+            </div>
+        """, unsafe_allow_html=True)
+
+# ==================================================
+# SIGNUP PAGE
+# ==================================================
+
+def signup_page():
+    st.set_page_config(
+        page_title="InstruNet AI – Sign Up",
+        layout="centered",
+        initial_sidebar_state="collapsed"
+    )
+
+    # =======================
+    # GLOBAL CSS (MATCH LOGIN)
+    # =======================
+    st.markdown("""
+        <style>
+        [data-testid="stSidebar"] {
+            display: none;
+        }
+
+        .block-container {
+            padding-top: 3.0rem;
+        }
+
+        .stTextInput input {
+            border-radius: 8px;
+        }
+
+        .stButton > button {
+            border-radius: 8px;
+            font-weight: 600;
+            padding: 0.6rem;
+        }
+
+        .auth-footer {
+            text-align: center;
+            margin-top: 1.5rem;
+            font-size: 14px;
+            color: #9ca3af;
+        }
+
+        .auth-footer a {
+            color: #8b5cf6;
+            font-weight: 500;
+            text-decoration: underline;
+        }
+
+        .auth-footer a:hover {
+            color: #7c3aed;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # =======================
+    # HEADER
+    # =======================
+    st.markdown("""
+        <div style="text-align: center; margin-bottom: 1rem;">
+            <h1 style="color: #667eea;">🎵 InstruNet AI</h1>
+            <p style="font-size: 18px; color: #9ca3af;">
+                Music Instrument Recognition System
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([1, 2, 1])
+
+    with col2:
+        if not supabase:
+            st.error("⚠️ Supabase is not configured.")
+            st.stop()
+
+        st.markdown("""
+            <div style="text-align: center; margin-top: 1.5rem; margin-bottom: 1.5rem;">
+                <p style="font-size: 22px; font-weight: 600; color: #e5e7eb;">
+                    Create Account
+                </p>
+                <p style="color: #9ca3af; font-size: 14px;">
+                    Join InstruNet AI to start analyzing music
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # =======================
+        # SIGNUP FORM
+        # =======================
+        with st.form("signup_form", clear_on_submit=True):
+            username = st.text_input("Username", placeholder="Choose a username")
+            email = st.text_input("Email Address", placeholder="your.email@example.com")
+            password = st.text_input(
+                "Password",
+                type="password",
+                placeholder="Create a strong password"
+            )
+            confirm_password = st.text_input(
+                "Confirm Password",
+                type="password",
+                placeholder="Re-enter your password"
+            )
+
+            if st.form_submit_button("🚀 Create Account", type="primary", use_container_width=True):
+                if not username or not email or not password or not confirm_password:
+                    st.error("❌ Please fill in all fields")
+                elif not validate_email(email):
+                    st.error("❌ Please enter a valid email address")
+                elif password != confirm_password:
+                    st.error("❌ Passwords do not match")
+                else:
+                    valid, message = validate_password(password)
+                    if not valid:
+                        st.error(f"❌ {message}")
+                    else:
+                        with st.spinner("Creating your account..."):
+                            success, msg = create_user(username, email, password)
+                            if success:
+                                st.success("✅ " + msg)
+                                st.query_params["auth"] = "login"
+                                st.rerun()
+                            else:
+                                st.error(f"❌ {msg}")
+
+        # =======================
+        # REAL HYPERLINK (NO BUTTON)
+        # =======================
+        st.markdown("""
+            <hr style="margin:2rem 0;">
+            <div class="auth-footer">
+                Already have an account?
+                <a href="?auth=login" target="_self">Sign in</a>
+            </div>
+        """, unsafe_allow_html=True)
 
 # ==================================================
 # HELPER FUNCTIONS
@@ -192,7 +480,7 @@ def main_app():
         .main-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 1.5rem 2rem;
+            padding: 1rem 2rem;
             border-radius: 12px;
             margin-bottom: 2rem;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
@@ -209,7 +497,7 @@ def main_app():
             opacity: 0.9;
         }
         
-        /* User profile - UPDATED: Removed role display */
+        /* User profile - FIXED: Proper circle avatar */
         .user-profile {
             display: flex;
             align-items: center;
@@ -221,16 +509,19 @@ def main_app():
         }
         
         .user-avatar {
-            width: 36px;
-            height: 36px;
+            width: 40px;
+            height: 40px;
+            min-width: 40px;
+            min-height: 40px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #26a69a 0%, #00897b 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: 700;
-            font-size: 16px;
+            font-size: 18px;
+            flex-shrink: 0;
         }
         
         .user-info {
@@ -244,13 +535,18 @@ def main_app():
             color: #1f2937;
         }
         
+        .user-role {
+            font-size: 12px;
+            color: #6b7280;
+        }
+        
         /* Results section */
         .results-header {
             background: #f0f9ff;
             padding: 1rem 1.5rem;
             border-radius: 8px;
             margin-bottom: 1rem;
-            border-left: 4px solid #26a69a;
+            border-left: 4px solid #667eea;
         }
         
         .results-header h3 {
@@ -265,13 +561,13 @@ def main_app():
             border-radius: 12px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             text-align: center;
-            border-top: 3px solid #26a69a;
+            border-top: 3px solid #667eea;
         }
         
         .metric-value {
             font-size: 2rem;
             font-weight: 700;
-            color: #00897b;
+            color: #667eea;
         }
         
         .metric-label {
@@ -288,66 +584,66 @@ def main_app():
             margin-top: 1rem;
         }
         
-        /* Sidebar styles - Pure grey with no whiteness */
+        /* Sidebar styles - FIXED: Dark grey to blend with UI */
         [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #c0c5ce 0%, #a0a8b0 100%);
+            background: linear-gradient(180deg, #374151 0%, #1f2937 100%);
         }
         
         [data-testid="stSidebar"] > div:first-child {
-            background: linear-gradient(180deg, #c0c5ce 0%, #a0a8b0 100%);
+            background: linear-gradient(180deg, #374151 0%, #1f2937 100%);
         }
         
-        /* Sidebar content styling - Dark text for visibility */
+        /* Sidebar content styling */
         [data-testid="stSidebar"] .stMarkdown {
-            color: #1a1d23 !important;
+            color: #e5e7eb !important;
         }
         
         [data-testid="stSidebar"] h3 {
-            color: #0d0f12 !important;
+            color: #f3f4f6 !important;
             font-weight: 700;
         }
         
         [data-testid="stSidebar"] label {
-            color: #1a1d23 !important;
+            color: #e5e7eb !important;
             font-weight: 500;
         }
         
         [data-testid="stSidebar"] .stSelectbox label,
         [data-testid="stSidebar"] .stSlider label {
-            color: #1a1d23 !important;
+            color: #e5e7eb !important;
         }
         
         /* Slider values visibility */
         [data-testid="stSidebar"] .stSlider [data-baseweb="slider"] {
-            color: #1a1d23 !important;
+            color: #e5e7eb !important;
         }
         
         [data-testid="stSidebar"] .stSlider div[data-testid="stTickBar"] div {
-            color: #2c3138 !important;
+            color: #d1d5db !important;
         }
         
         /* File uploader in sidebar */
         [data-testid="stSidebar"] [data-testid="stFileUploader"] {
-            background: rgba(255, 255, 255, 0.9);
+            background: rgba(55, 65, 81, 0.5);
             padding: 1rem;
             border-radius: 8px;
-            border: 2px dashed #8891a0;
+            border: 2px dashed #6b7280;
         }
         
         [data-testid="stSidebar"] [data-testid="stFileUploader"] label {
-            color: #1a1d23 !important;
+            color: #e5e7eb !important;
         }
         
         /* Success message in sidebar */
         [data-testid="stSidebar"] .element-container .stSuccess {
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(55, 65, 81, 0.8);
             border-left: 4px solid #48bb78;
             padding: 0.75rem;
             border-radius: 4px;
         }
         
         [data-testid="stSidebar"] .element-container .stSuccess p {
-            color: #1a1d23 !important;
+            color: #e5e7eb !important;
         }
         
         /* Button styles */
@@ -364,7 +660,7 @@ def main_app():
         
         /* Primary button color */
         .stButton > button[kind="primary"] {
-            background: linear-gradient(135deg, #26a69a 0%, #00897b 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border: none;
         }
         
@@ -409,21 +705,24 @@ def main_app():
     with col_user:
         st.markdown("<br>", unsafe_allow_html=True)
         initial = st.session_state.user["username"][0].upper()
-        # UPDATED: Removed "Analyst" role display
+        # FIXED: Circle avatar + "User" instead of email
         st.markdown(f"""
             <div class="user-profile">
                 <div class="user-avatar">{initial}</div>
                 <div class="user-info">
                     <div class="user-name">{st.session_state.user["username"]}</div>
+                    <div class="user-role">User</div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
         
         if st.button("🚪 Logout", use_container_width=True):
             st.session_state.authenticated = False
+            st.session_state.user = None
             st.session_state.results = None
             st.session_state.audio_data = None
             st.session_state.visualizations = {}
+            st.session_state.auth_page = "login"
             st.rerun()
     
     # ==================================================
@@ -649,12 +948,13 @@ def main_app():
             st.caption("Time-domain representation showing amplitude variations")
             
             fig_wav, ax = plt.subplots(figsize=(12, 3))
-            librosa.display.waveshow(y, sr=sr, ax=ax, color='#26a69a')
+            librosa.display.waveshow(y, sr=sr, ax=ax, color='#667eea')
             ax.set_xlabel("Time (seconds)", fontsize=11)
             ax.set_ylabel("Amplitude", fontsize=11)
             ax.grid(True, alpha=0.3)
             plt.tight_layout()
             st.pyplot(fig_wav)
+            st.session_state.visualizations["waveform"] = fig_wav
             plt.close(fig_wav)
             
             st.markdown("---")
@@ -717,7 +1017,7 @@ def main_app():
                 st.markdown("""
                     <div style="background: white; padding: 1.5rem; border-radius: 12px; 
                                 box-shadow: 0 2px 4px rgba(0,0,0,0.05); height: 100%;
-                                border-top: 3px solid #26a69a;">
+                                border-top: 3px solid #667eea;">
                         <h4 style="margin-top: 0;">📄 JSON Export</h4>
                         <p style="color: #6b7280; font-size: 14px;">
                             Machine-readable format containing:
@@ -752,7 +1052,7 @@ def main_app():
                 st.markdown("""
                     <div style="background: white; padding: 1.5rem; border-radius: 12px; 
                                 box-shadow: 0 2px 4px rgba(0,0,0,0.05); height: 100%;
-                                border-top: 3px solid #26a69a;">
+                                border-top: 3px solid #667eea;">
                         <h4 style="margin-top: 0;">📑 PDF Export</h4>
                         <p style="color: #6b7280; font-size: 14px;">
                             Professional report including:
@@ -809,16 +1109,17 @@ def main_app():
                 temp_path = f.name
             
             # Load model
-            model_path = "model/best_l2_regularized_model.h5"
+            BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+            model_path = os.path.join(BASE_DIR, "model", "best_l2_regularized_model.h5")
             if not os.path.exists(model_path):
                 st.error(f"❌ Model file not found: {model_path}")
                 st.stop()
             
             model = tf.keras.models.load_model(model_path)
             
-            # Run inference
+            # Run inference - pass audio_name for proper JSON metadata
             smoothed, times, aggregated, json_out = run_inference(
-                temp_path, model, aggregation, threshold, smoothing
+                temp_path, model, aggregation, threshold, smoothing, audio_name=audio_name
             )
             
             # Store results
@@ -839,13 +1140,12 @@ def main_app():
 # ENTRY POINT
 # ==================================================
 
-if SKIP_AUTH:
-    # Bypass authentication if SKIP_AUTH is enabled
-    if not st.session_state.authenticated:
-        st.session_state.authenticated = True
-        st.session_state.user = {"username": "User"}
-    main_app()
-elif not st.session_state.authenticated:
-    login_page()
+auth = st.query_params.get("auth", "login")
+
+if not st.session_state.authenticated:
+    if auth == "signup":
+        signup_page()
+    else:
+        login_page()
 else:
     main_app()
