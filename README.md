@@ -75,16 +75,8 @@ https://cnn-based-music-instrument-recognition-system.streamlit.app/
    - Ensure `model/best_l2_regularized_model.h5` is present
    - This is the trained CNN model file
 
-5. **Set password (optional)**
-   ```bash
-   # Windows
-   set INSTRUNET_PASSWORD=your_secure_password
-   
-   # Linux/Mac
-   export INSTRUNET_PASSWORD=your_secure_password
-   ```
-   
-   If not set, default password is `instrunet2025`
+5. **Set password**
+   Just like every application or SaaS service, remeber the password set while creating the account
 
 ## 🎯 Usage
 
@@ -100,7 +92,7 @@ The application will open in your default browser at `http://localhost:8501`
 
 1. **Login**
    - Enter your name
-   - Use password: `instrunet2025` (or your custom password)
+   - Use password set at the time of creating new account
 
 2. **Upload Audio**
    - Click "Choose audio file" in the sidebar
@@ -176,42 +168,6 @@ InstruNet-AI/
 - **ROC-AUC**: 0.94+
 - **Dataset**: IRMAS (6,705 samples)
 
-## 🎓 Academic Context
-
-This project was developed as **Task 19** - the final deliverable of a comprehensive internship focusing on:
-
-- Data preprocessing and augmentation
-- CNN architecture design and optimization
-- Hyperparameter tuning (kernel size, optimizers, regularization)
-- Evaluation metrics and model selection
-- Production-ready deployment
-
-### Key Experiments Conducted
-- **Task 11**: Hyperparameter tuning (kernel size: 3×3 → 5×5)
-- **Task 12**: Optimizer comparison (SGD, Adam, RMSProp)
-- **Task 13**: L2 + Dropout regularization
-- **Task 14**: Data segmentation strategy
-- **Task 15**: Aggregation methods evaluation
-- **Task 16**: Intensity timeline generation
-
-## 🔒 Security Notes
-
-### Authentication
-- Default password: `instrunet2025`
-- Set custom password via environment variable
-- Session-based authentication
-- Automatic logout functionality
-
-### Production Deployment
-For production use:
-```bash
-# Set secure password
-export INSTRUNET_PASSWORD="your_very_secure_password_here"
-
-# Run with production settings
-streamlit run app.py --server.port=8501 --server.headless=true
-```
-
 ## 📊 Example Outputs
 
 ### JSON Export Structure
@@ -246,32 +202,6 @@ streamlit run app.py --server.port=8501 --server.headless=true
 - Instrument intensity timeline
 - Interpretation and methodology notes
 
-## 🛠️ Troubleshooting
-
-### Common Issues
-
-**Model file not found**
-```
-Error: Model file not found: model/best_l2_regularized_model.h5
-```
-- Ensure the model file exists in the `model/` directory
-- Download from the original repository if missing
-
-**Memory errors during processing**
-```
-tensorflow.python.framework.errors_impl.ResourceExhaustedError
-```
-- Close other applications to free memory
-- Try shorter audio files
-- Reduce batch processing if modified
-
-**Authentication issues**
-```
-Invalid password
-```
-- Check if environment variable is set correctly
-- Use default password `instrunet2025` if no custom password set
-- Clear browser cache and try again
 
 ## 🤝 Contributing
 
@@ -279,7 +209,7 @@ This is an academic project completed for internship requirements. Contributions
 
 ## 👥 Authors
 
-Developed as part of Infosys Springboard Virtual Internship 6.0
+K. Surya Teja: Developed as part of Infosys Springboard Virtual Internship 6.0 (November 2025 - January 2026)
 
 ## 🙏 Acknowledgments
 
