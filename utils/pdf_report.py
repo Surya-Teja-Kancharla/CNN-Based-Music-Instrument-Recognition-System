@@ -93,7 +93,7 @@ def generate_pdf_report(audio_name, aggregation, threshold, smoothing,
 
     # ================= PAGE 1 =================
 
-    elements.append(Spacer(1, 0.3 * inch))
+    elements.append(Spacer(1, 0.15 * inch))
     elements.append(Paragraph("🎵 InstruNet AI", title_style))
     elements.append(Paragraph("Instrument Recognition Analysis Report", subtitle_style))
 
