@@ -2,8 +2,43 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
+import librosa.display
 from config import CLASS_NAMES, CLASS_DISPLAY_NAMES
 
+def plot_waveform(audio, sr):
+    """
+    Plot the raw audio waveform (time-domain representation).
+
+    Args:
+        audio (np.ndarray): Audio signal
+        sr (int): Sampling rate
+
+    Returns:
+        matplotlib.figure.Figure
+    """
+    fig, ax = plt.subplots(figsize=(12, 3))
+
+    librosa.display.waveshow(
+        audio,
+        sr=sr,
+        ax=ax,
+        alpha=0.85
+    )
+
+    ax.set_title(
+        "Audio Waveform",
+        fontsize=13,
+        fontweight="bold",
+        pad=10
+    )
+    ax.set_xlabel("Time (seconds)", fontsize=11)
+    ax.set_ylabel("Amplitude", fontsize=11)
+
+    ax.grid(True, alpha=0.3, linestyle=":")
+
+    plt.tight_layout()
+    return fig
+    
 def plot_intensity(times, intensities, threshold):
     """
     Basic intensity plot for all instruments

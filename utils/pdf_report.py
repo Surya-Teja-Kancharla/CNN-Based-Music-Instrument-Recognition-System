@@ -1,399 +1,441 @@
-# utils/pdf_report.py
-
-from reportlab.lib.pagesizes import A4, letter
-from reportlab.pdfgen import canvas
-from reportlab.lib.units import inch
 from reportlab.lib import colors
-from reportlab.platypus import Table, TableStyle
-from reportlab.lib.utils import ImageReader
-import tempfile
-import os
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import (
+    SimpleDocTemplate, Table, TableStyle, Paragraph,
+    Spacer, PageBreak, Image
+)
+from reportlab.lib.enums import TA_CENTER
 from datetime import datetime
+from io import BytesIO
+import tempfile
+
 from config import CLASS_DISPLAY_NAMES
 
-def generate_pdf_report(
-    audio_name,
-    aggregation,
-    threshold,
-    smoothing,
-    confidence_dict,
-    visualizations=None
-):
+
+def generate_pdf_report(audio_name, aggregation, threshold, smoothing,
+                        confidence_dict, visualizations):
     """
-    Generate a comprehensive PDF report with multiple visualizations
-    
-    Args:
-        audio_name: Name of the audio file
-        aggregation: Aggregation method used
-        threshold: Detection threshold
-        smoothing: Smoothing window size
-        confidence_dict: Dictionary of {class: confidence} for detected instruments
-        visualizations: Dictionary of matplotlib figures
-    
-    Returns:
-        Path to generated PDF file
+    Generate a professional PDF report
     """
-    temp_dir = tempfile.mkdtemp()
-    pdf_path = os.path.join(temp_dir, f"{audio_name}_analysis.pdf")
-    
-    # Create canvas
-    c = canvas.Canvas(pdf_path, pagesize=letter)
-    width, height = letter
-    
-    # Page margins
-    margin_left = 50
-    margin_right = width - 50
-    margin_top = height - 50
-    margin_bottom = 50
-    
-    y_position = margin_top
-    
-    # =====================================
-    # TITLE PAGE
-    # =====================================
-    
-    # Main title
-    c.setFont("Helvetica-Bold", 24)
-    c.setFillColorRGB(0.4, 0.49, 0.9)  # Blue color
-    c.drawString(margin_left, y_position, "InstruNet AI")
-    y_position -= 30
-    
-    c.setFont("Helvetica", 16)
-    c.setFillColorRGB(0, 0, 0)
-    c.drawString(margin_left, y_position, "Instrument Recognition Report")
-    y_position -= 10
-    
-    # Decorative line
-    c.setStrokeColorRGB(0.4, 0.49, 0.9)
-    c.setLineWidth(2)
-    c.line(margin_left, y_position, margin_right, y_position)
-    y_position -= 40
-    
-    # Report metadata
-    c.setFont("Helvetica", 10)
-    c.setFillColorRGB(0.4, 0.4, 0.4)
-    
-    report_date = datetime.now().strftime("%B %d, %Y at %I:%M %p")
-    c.drawString(margin_left, y_position, f"Generated: {report_date}")
-    y_position -= 50
-    
-    # =====================================
-    # ANALYSIS DETAILS
-    # =====================================
-    
-    c.setFont("Helvetica-Bold", 14)
-    c.setFillColorRGB(0, 0, 0)
-    c.drawString(margin_left, y_position, "Analysis Details")
-    y_position -= 20
-    
-    c.setFont("Helvetica", 10)
-    details = [
-        f"Audio File: {audio_name}",
-        f"Aggregation Method: {aggregation.capitalize()}",
-        f"Detection Threshold: {threshold:.2f}",
-        f"Smoothing Window: {smoothing} segments",
+
+    # Create temp file for PDF
+    pdf_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+    pdf_path = pdf_file.name
+    pdf_file.close()
+
+    # Create PDF document
+    doc = SimpleDocTemplate(
+        pdf_path,
+        pagesize=letter,
+        rightMargin=0.75 * inch,
+        leftMargin=0.75 * inch,
+        topMargin=0.75 * inch,
+        bottomMargin=0.75 * inch
+    )
+
+    elements = []
+
+    # Styles
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=28,
+        textColor=colors.HexColor('#667eea'),
+        spaceAfter=6,
+        alignment=TA_CENTER,
+        fontName='Helvetica-Bold'
+    )
+
+    subtitle_style = ParagraphStyle(
+        'CustomSubtitle',
+        parent=styles['Normal'],
+        fontSize=14,
+        textColor=colors.HexColor('#6b7280'),
+        spaceAfter=20,
+        alignment=TA_CENTER,
+        fontName='Helvetica'
+    )
+
+    heading2_style = ParagraphStyle(
+        'CustomHeading2',
+        parent=styles['Heading2'],
+        fontSize=18,
+        textColor=colors.HexColor('#1f2937'),
+        spaceAfter=12,
+        spaceBefore=20,
+        fontName='Helvetica-Bold',
+        backColor=colors.HexColor('#f0f9ff'),
+        leftIndent=10
+    )
+
+    heading3_style = ParagraphStyle(
+        'CustomHeading3',
+        parent=styles['Heading3'],
+        fontSize=14,
+        textColor=colors.HexColor('#374151'),
+        spaceAfter=10,
+        spaceBefore=15,
+        fontName='Helvetica-Bold'
+    )
+
+    body_style = ParagraphStyle(
+        'CustomBody',
+        parent=styles['Normal'],
+        fontSize=11,
+        textColor=colors.HexColor('#4b5563'),
+        spaceAfter=8,
+        leading=14
+    )
+
+    # ================= PAGE 1 =================
+
+    elements.append(Spacer(1, 0.3 * inch))
+    elements.append(Paragraph("🎵 InstruNet AI", title_style))
+    elements.append(Paragraph("Instrument Recognition Analysis Report", subtitle_style))
+
+    current_time = datetime.now().strftime("%B %d, %Y at %I:%M %p")
+
+    metadata_data = [
+        ['Generated:', current_time],
+        ['Audio File:', audio_name],
+        ['Analysis Date:', datetime.now().strftime("%Y-%m-%d")]
     ]
-    
-    for detail in details:
-        c.drawString(margin_left + 10, y_position, detail)
-        y_position -= 18
-    
-    y_position -= 20
-    
-    # =====================================
-    # DETECTED INSTRUMENTS
-    # =====================================
-    
-    c.setFont("Helvetica-Bold", 14)
-    c.setFillColorRGB(0, 0, 0)
-    c.drawString(margin_left, y_position, "Detected Instruments")
-    y_position -= 5
-    
-    # Underline
-    c.setStrokeColorRGB(0, 0, 0)
-    c.setLineWidth(0.5)
-    c.line(margin_left, y_position, margin_left + 180, y_position)
-    y_position -= 20
-    
+
+    metadata_table = Table(metadata_data, colWidths=[2 * inch, 4 * inch])
+
+    metadata_table.setStyle(TableStyle([
+        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e5e7eb')),
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f9fafb')),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+        ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+        ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('PADDING', (0, 0), (-1, -1), 10),
+    ]))
+
+    elements.append(metadata_table)
+    elements.append(Spacer(1, 0.3 * inch))
+
+    # ================= SETTINGS =================
+
+    elements.append(Paragraph("⚙️ Analysis Configuration", heading2_style))
+    elements.append(Spacer(1, 0.1 * inch))
+
+    settings_data = [
+        ['Parameter', 'Value', 'Description'],
+        ['Aggregation Method', aggregation.capitalize(),
+         'Method used to combine predictions'],
+        ['Detection Threshold', f'{threshold:.2f}',
+         'Minimum confidence required'],
+        ['Smoothing Window', f'{smoothing} segments',
+         'Temporal smoothing window'],
+    ]
+
+    settings_table = Table(
+        settings_data,
+        colWidths=[1.8 * inch, 1.5 * inch, 3.2 * inch]
+    )
+
+    settings_table.setStyle(TableStyle([
+        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e5e7eb')),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+    ]))
+
+    elements.append(settings_table)
+    elements.append(Spacer(1, 0.3 * inch))
+
+    # ================= SUMMARY =================
+
+    elements.append(Paragraph("🎼 Detection Summary", heading2_style))
+    elements.append(Spacer(1, 0.1 * inch))
+
     if confidence_dict:
-        # Sort by confidence (descending)
+
         sorted_instruments = sorted(
             confidence_dict.items(),
             key=lambda x: x[1],
             reverse=True
         )
-        
-        c.setFont("Helvetica", 10)
-        
-        for cls, score in sorted_instruments:
-            display_name = CLASS_DISPLAY_NAMES.get(cls, cls.upper())
-            
-            # Instrument name
-            c.setFont("Helvetica-Bold", 10)
-            c.drawString(margin_left + 20, y_position, f"• {display_name}")
-            
-            # Confidence score
-            c.setFont("Helvetica", 10)
-            c.setFillColorRGB(0.2, 0.6, 0.2)  # Green
-            c.drawString(
-                margin_left + 250,
-                y_position,
-                f"Confidence: {score * 100:.1f}%"
-            )
-            c.setFillColorRGB(0, 0, 0)  # Reset to black
-            
-            # Confidence bar
-            bar_width = 150
-            bar_height = 8
-            bar_x = margin_left + 380
-            bar_y = y_position - 2
-            
-            # Background (gray)
-            c.setFillColorRGB(0.9, 0.9, 0.9)
-            c.rect(bar_x, bar_y, bar_width, bar_height, fill=True, stroke=False)
-            
-            # Foreground (confidence level)
-            bar_fill_width = bar_width * min(score, 1.0)
-            
-            # Color based on confidence
-            if score >= 0.7:
-                c.setFillColorRGB(0.2, 0.7, 0.2)  # Green
-            elif score >= 0.5:
-                c.setFillColorRGB(0.9, 0.7, 0.1)  # Yellow
-            else:
-                c.setFillColorRGB(0.9, 0.5, 0.2)  # Orange
-            
-            c.rect(bar_x, bar_y, bar_fill_width, bar_height, fill=True, stroke=False)
-            c.setFillColorRGB(0, 0, 0)  # Reset
-            
-            y_position -= 25
-            
-            # Check if we need a new page
-            if y_position < 150:
-                c.showPage()
-                y_position = margin_top
-    else:
-        c.setFont("Helvetica-Oblique", 10)
-        c.setFillColorRGB(0.6, 0.6, 0.6)
-        c.drawString(margin_left + 20, y_position, "No instruments detected above threshold")
-        c.setFillColorRGB(0, 0, 0)
-        y_position -= 25
-    
-    y_position -= 20
-    
-    # =====================================
-    # SUMMARY STATISTICS
-    # =====================================
-    
-    if confidence_dict:
-        c.setFont("Helvetica-Bold", 14)
-        c.drawString(margin_left, y_position, "Summary Statistics")
-        y_position -= 5
-        
-        c.setStrokeColorRGB(0, 0, 0)
-        c.setLineWidth(0.5)
-        c.line(margin_left, y_position, margin_left + 180, y_position)
-        y_position -= 20
-        
-        c.setFont("Helvetica", 10)
-        
-        avg_confidence = sum(confidence_dict.values()) / len(confidence_dict)
-        max_confidence = max(confidence_dict.values())
-        min_confidence = min(confidence_dict.values())
-        
-        stats = [
-            f"Total Instruments Detected: {len(confidence_dict)}",
-            f"Average Confidence: {avg_confidence * 100:.1f}%",
-            f"Maximum Confidence: {max_confidence * 100:.1f}%",
-            f"Minimum Confidence: {min_confidence * 100:.1f}%",
+
+        avg_conf = sum(confidence_dict.values()) / len(confidence_dict)
+
+        summary_data = [
+            ['Metric', 'Value'],
+            ['Total Instruments', str(len(confidence_dict))],
+            ['Average Confidence', f'{avg_conf * 100:.1f}%'],
+            ['Highest Confidence', f'{max(confidence_dict.values()) * 100:.1f}%'],
+            ['Lowest Confidence', f'{min(confidence_dict.values()) * 100:.1f}%']
         ]
-        
-        for stat in stats:
-            c.drawString(margin_left + 20, y_position, stat)
-            y_position -= 18
-    
-    # =====================================
-    # VISUALIZATIONS
-    # =====================================
-    
-    if visualizations:
-        # Start new page for visualizations
-        c.showPage()
-        y_position = margin_top
-        
-        c.setFont("Helvetica-Bold", 16)
-        c.setFillColorRGB(0.4, 0.49, 0.9)
-        c.drawString(margin_left, y_position, "Visualizations")
-        y_position -= 10
-        
-        c.setStrokeColorRGB(0.4, 0.49, 0.9)
-        c.setLineWidth(2)
-        c.line(margin_left, y_position, margin_right, y_position)
-        y_position -= 40
-        
-        c.setFillColorRGB(0, 0, 0)
-        
-        # Mel Spectrogram
-        if "mel_spec" in visualizations:
-            mel_fig = visualizations["mel_spec"]
-            mel_path = os.path.join(temp_dir, "mel_spectrogram.png")
-            mel_fig.savefig(mel_path, dpi=150, bbox_inches="tight")
-            
-            c.setFont("Helvetica-Bold", 12)
-            c.drawString(margin_left, y_position, "Mel Spectrogram")
-            y_position -= 5
-            
-            c.setFont("Helvetica", 9)
-            c.setFillColorRGB(0.4, 0.4, 0.4)
-            c.drawString(
-                margin_left,
-                y_position,
-                "Frequency-domain representation used as CNN input"
+
+        summary_table = Table(summary_data, colWidths=[3 * inch, 3.5 * inch])
+
+        summary_table.setStyle(TableStyle([
+            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e5e7eb')),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ]))
+
+        elements.append(summary_table)
+        elements.append(Spacer(1, 0.3 * inch))
+
+        # ================= INSTRUMENTS =================
+
+        elements.append(Paragraph("✅ Detected Instruments", heading2_style))
+        elements.append(Spacer(1, 0.1 * inch))
+
+        instruments_data = [['Rank', 'Instrument', 'Confidence', 'Status']]
+
+        for i, (cls, conf) in enumerate(sorted_instruments, 1):
+
+            name = CLASS_DISPLAY_NAMES.get(cls, cls.upper())
+            conf_pct = f'{conf * 100:.1f}%'
+            status = '✓ Detected' if conf >= threshold else '○ Below Threshold'
+
+            instruments_data.append(
+                [str(i), name, conf_pct, status]
             )
-            c.setFillColorRGB(0, 0, 0)
-            y_position -= 15
-            
-            # Insert image
-            img_width = width - 2 * margin_left
-            img_height = 200
-            
-            c.drawImage(
-                mel_path,
-                margin_left,
-                y_position - img_height,
-                width=img_width,
-                height=img_height,
-                preserveAspectRatio=True
-            )
-            y_position -= img_height + 30
-        
-        # Intensity Timeline
-        if "timeline" in visualizations:
-            # Check if we need a new page
-            if y_position < 250:
-                c.showPage()
-                y_position = margin_top
-            
-            timeline_fig = visualizations["timeline"]
-            timeline_path = os.path.join(temp_dir, "intensity_timeline.png")
-            timeline_fig.savefig(timeline_path, dpi=150, bbox_inches="tight")
-            
-            c.setFont("Helvetica-Bold", 12)
-            c.drawString(margin_left, y_position, "Instrument Intensity Timeline")
-            y_position -= 5
-            
-            c.setFont("Helvetica", 9)
-            c.setFillColorRGB(0.4, 0.4, 0.4)
-            c.drawString(
-                margin_left,
-                y_position,
-                "Temporal evolution of instrument confidence over time"
-            )
-            c.setFillColorRGB(0, 0, 0)
-            y_position -= 15
-            
-            # Insert image
-            img_width = width - 2 * margin_left
-            img_height = 250
-            
-            c.drawImage(
-                timeline_path,
-                margin_left,
-                y_position - img_height,
-                width=img_width,
-                height=img_height,
-                preserveAspectRatio=True
-            )
-            y_position -= img_height + 20
-    
-    # =====================================
-    # INTERPRETATION
-    # =====================================
-    
-    # Check if we need a new page
-    if y_position < 200:
-        c.showPage()
-        y_position = margin_top
-    
-    c.setFont("Helvetica-Bold", 14)
-    c.setFillColorRGB(0, 0, 0)
-    c.drawString(margin_left, y_position, "Interpretation")
-    y_position -= 5
-    
-    c.setStrokeColorRGB(0, 0, 0)
-    c.setLineWidth(0.5)
-    c.line(margin_left, y_position, margin_left + 150, y_position)
-    y_position -= 20
-    
-    c.setFont("Helvetica", 9)
-    
-    interpretation_text = [
-        "This report presents the results of automated instrument recognition analysis.",
-        "",
-        "The confidence scores represent the model's belief in the presence of each",
-        "instrument, based on analysis of the audio's spectral characteristics.",
-        "",
-        f"Instruments with confidence above {threshold:.2f} are considered detected.",
-        "",
-        "The temporal timeline shows how confidence evolves over the duration of the",
-        "audio track, allowing identification of when specific instruments are active.",
-    ]
-    
-    for line in interpretation_text:
-        c.drawString(margin_left + 10, y_position, line)
-        y_position -= 14
-    
-    y_position -= 20
-    
-    # =====================================
-    # METHODOLOGY NOTE
-    # =====================================
-    
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(margin_left, y_position, "Methodology")
-    y_position -= 5
-    
-    c.setStrokeColorRGB(0, 0, 0)
-    c.setLineWidth(0.5)
-    c.line(margin_left, y_position, margin_left + 120, y_position)
-    y_position -= 18
-    
-    c.setFont("Helvetica", 9)
-    
-    methodology_text = [
-        f"• Segmentation: 3.0-second windows with 1.5-second hop",
-        f"• Feature Extraction: 128-band log-mel spectrograms",
-        f"• Model: CNN with L2 regularization",
-        f"• Aggregation: {aggregation.capitalize()} pooling across segments",
-        f"• Smoothing: Moving average with window size {smoothing}",
-    ]
-    
-    for line in methodology_text:
-        c.drawString(margin_left + 10, y_position, line)
-        y_position -= 14
-    
-    # =====================================
-    # FOOTER
-    # =====================================
-    
-    c.setFont("Helvetica", 8)
-    c.setFillColorRGB(0.5, 0.5, 0.5)
-    c.drawString(
-        margin_left,
-        margin_bottom - 20,
-        "Generated by InstruNet AI - Music Instrument Recognition System"
-    )
-    
-    # Page numbers on all pages
-    page_num = c.getPageNumber()
-    for i in range(1, page_num + 1):
-        c.drawString(
-            width - margin_left - 50,
-            margin_bottom - 20,
-            f"Page {i} of {page_num}"
+
+        instruments_table = Table(
+            instruments_data,
+            colWidths=[0.7 * inch, 2.5 * inch, 1.5 * inch, 1.8 * inch]
         )
-    
-    # Save PDF
-    c.save()
-    
+
+        instruments_table.setStyle(TableStyle([
+            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e5e7eb')),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('ALIGN', (0, 1), (-1, -1), 'CENTER'),
+        ]))
+
+        elements.append(instruments_table)
+
+    else:
+
+        elements.append(
+            Paragraph("⚠️ No instruments detected.", body_style)
+        )
+
+    # ================= PAGE 2 =================
+
+    elements.append(PageBreak())
+
+    elements.append(Paragraph("📊 Visualizations", heading2_style))
+    elements.append(Spacer(1, 0.2 * inch))
+
+    # -------- Waveform --------
+
+    if 'waveform' in visualizations:
+
+        elements.append(Paragraph("Audio Waveform", heading3_style))
+
+        elements.append(Paragraph(
+            "Time-domain representation of the original audio signal. "
+            "This shows amplitude variations across time.",
+            body_style
+        ))
+
+        elements.append(Spacer(1, 0.1 * inch))
+
+        waveform_fig = visualizations['waveform']
+
+        waveform_buf = BytesIO()
+        waveform_fig.savefig(
+            waveform_buf,
+            format='png',
+            dpi=150,
+            bbox_inches='tight'
+        )
+        waveform_buf.seek(0)
+
+        waveform_img = Image(
+            waveform_buf,
+            width=6.5 * inch,
+            height=2.0 * inch
+        )
+
+        elements.append(waveform_img)
+        elements.append(Spacer(1, 0.3 * inch))
+        
+
+    # -------- Mel Spectrogram --------
+
+    if 'mel_spec' in visualizations:
+
+        elements.append(Paragraph("Mel Spectrogram", heading3_style))
+
+        elements.append(Paragraph(
+            "Frequency-domain representation of the audio signal converted into "
+            "mel-scaled bands. This visualization is used as the primary input "
+            "feature for the CNN model, where brighter regions indicate higher "
+            "energy concentrations at specific frequencies and time intervals.",
+            body_style
+        ))
+
+        elements.append(Spacer(1, 0.1 * inch))
+
+        mel_fig = visualizations['mel_spec']
+
+        mel_buf = BytesIO()
+        mel_fig.savefig(mel_buf, format='png', dpi=150, bbox_inches='tight')
+        mel_buf.seek(0)
+
+        mel_img = Image(mel_buf, width=6.5 * inch, height=2.5 * inch)
+
+        elements.append(mel_img)
+        elements.append(Spacer(1, 0.3 * inch))
+
+    # -------- Timeline --------
+
+    if 'timeline' in visualizations:
+        
+        elements.append(Paragraph("Instrument Intensity Timeline", heading3_style))
+
+        elements.append(Paragraph(
+            "Temporal representation of confidence scores for detected instruments "
+            "across the audio duration. Each curve indicates the probability of an "
+            "instrument being present over time, while the dashed line represents "
+            "the detection threshold used for final classification.",
+            body_style
+        ))
+
+        elements.append(Spacer(1, 0.1 * inch))
+
+        timeline_fig = visualizations['timeline']
+
+
+        timeline_buf = BytesIO()
+        timeline_fig.savefig(timeline_buf, format='png', dpi=150, bbox_inches='tight')
+        timeline_buf.seek(0)
+
+        timeline_img = Image(
+            timeline_buf,
+            width=6.5 * inch,
+            height=3.5 * inch
+        )
+
+        elements.append(timeline_img)
+
+    # ================= PAGE 3 =================
+
+    elements.append(Paragraph("🔬 Methodology & Interpretation", heading2_style))
+    elements.append(Spacer(1, 0.2 * inch))
+
+    elements.append(Paragraph("Model Architecture", heading3_style))
+
+    elements.append(Paragraph(
+        "InstruNet AI employs a deep Convolutional Neural Network (CNN) "
+        "specifically designed for multi-label music instrument recognition "
+        "using log-scaled mel-spectrogram representations of audio signals.",
+        body_style
+    ))
+
+    elements.append(Paragraph(
+        "The input to the network is a two-dimensional mel-spectrogram treated "
+        "as a single-channel image, preserving both temporal and spectral "
+        "characteristics of the audio. The architecture consists of four "
+        "hierarchical convolutional blocks with increasing filter depths of "
+        "32, 64, 128, and 256 respectively. Each convolution uses a 5×5 kernel "
+        "with same padding and ReLU activation, enabling the network to capture "
+        "broad time–frequency patterns such as harmonic structures, timbral "
+        "textures, and transient events.",
+        body_style
+    ))
+
+    elements.append(Paragraph(
+        "Each convolutional layer is followed by Batch Normalization to stabilize "
+        "training and improve convergence. MaxPooling layers are applied after "
+        "the first three convolutional blocks to progressively reduce spatial "
+        "resolution while retaining salient features. The final convolutional "
+        "block omits pooling to preserve high-level feature maps prior to global "
+        "aggregation.",
+        body_style
+    ))
+
+    elements.append(Paragraph(
+        "Global Average Pooling is employed instead of fully connected layers, "
+        "significantly reducing the number of trainable parameters and improving "
+        "generalization. This design choice forces the network to learn "
+        "class-specific activation maps rather than memorizing spatial positions. "
+        "A Dropout layer with a rate of 0.4 is applied to further mitigate "
+        "overfitting.",
+        body_style
+    ))
+
+    elements.append(Paragraph(
+        "The output layer consists of a dense layer with sigmoid activation, "
+        "producing independent probability scores for each instrument class. "
+        "This formulation supports multi-label classification, allowing multiple "
+        "instruments to be detected simultaneously within the same audio segment.",
+        body_style
+    ))
+
+    elements.append(Paragraph(
+        "L2 weight regularization (λ = 1e-4) is applied to all convolutional and "
+        "output layers to penalize large weights and enhance robustness. The model "
+        "is trained using Stochastic Gradient Descent (SGD) with a learning rate of "
+        "0.01, momentum of 0.9, and Nesterov acceleration. Binary cross-entropy is "
+        "used as the loss function, and training is controlled using Early "
+        "Stopping, learning rate reduction on plateau, and best-model checkpointing "
+        "based on validation loss.",
+        body_style
+    ))
+
+    elements.append(Spacer(1, 0.2 * inch))
+
+    elements.append(Paragraph("Analysis Process", heading3_style))
+
+    process_data = [
+        ['Step', 'Description'],
+        ['1', 'Segmentation'],
+        ['2', 'Feature Extraction'],
+        ['3', 'Model Prediction'],
+        ['4', 'Temporal Smoothing'],
+        ['5', 'Aggregation'],
+    ]
+
+    process_table = Table(process_data, colWidths=[1.2 * inch, 5.3 * inch])
+
+    process_table.setStyle(TableStyle([
+        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e5e7eb')),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+    ]))
+
+    elements.append(process_table)
+    elements.append(Spacer(1, 0.3 * inch))
+
+    # ================= FOOTER =================
+
+    footer_style = ParagraphStyle(
+        'Footer',
+        parent=styles['Normal'],
+        fontSize=9,
+        textColor=colors.HexColor('#9ca3af'),
+        alignment=TA_CENTER,
+        fontName='Helvetica-Oblique'
+    )
+
+    # ================= BUILD =================
+
+    doc.build(elements)
+
     return pdf_path

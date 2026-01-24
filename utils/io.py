@@ -7,6 +7,20 @@ def intensity_to_json(
     wav_name, times, intensities,
     aggregation, smoothing, threshold
 ):
+    """
+    Convert intensity data to JSON format
+    
+    Args:
+        wav_name: Name of the audio file
+        times: List of time points
+        intensities: Array of intensity values
+        aggregation: Aggregation method used
+        smoothing: Smoothing window size
+        threshold: Detection threshold
+    
+    Returns:
+        Dictionary in JSON format
+    """
     return {
         "audio_file": wav_name,
         "segment_duration_sec": WINDOW_SEC,
