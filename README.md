@@ -6,6 +6,10 @@ A sophisticated CNN-based system for automatic detection and classification of m
 
 https://cnn-based-music-instrument-recognition-system.streamlit.app/
 
+## ▶️ Demo Link
+
+https://youtu.be/tSLNAQEp4Dg
+
 ## ✨ Features
 
 ### 🎼 Core Capabilities
